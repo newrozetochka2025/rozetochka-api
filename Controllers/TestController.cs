@@ -6,7 +6,7 @@ using rozetochka_api.Shared;
 namespace rozetochka_api.Controllers
 {
 
-    // Test контроллер для тестов
+    // Test контроллер для "тестовых" API запросов
 
     // GET /api/test/user
     [Route("api/[controller]")]

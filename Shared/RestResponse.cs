@@ -16,7 +16,7 @@
         public string Action { get; set; } = "Read";
         public string DataType { get; set; } = "null";
         public long Time { get; set; } = DateTimeOffset.UtcNow.ToUnixTimeSeconds();    // Вернёт Unix time в секундах прошедших с 01.01.1970 UTC.
-        public Dictionary<string, object>? Params { get; set; } = [];      // Вернуть параметры из запроса
+        public Dictionary<string, object>? Params { get; set; } = [];      // Params -> для возврата параметров из запроса
     }
 
     public class RestStatus

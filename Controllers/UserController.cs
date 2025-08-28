@@ -35,10 +35,10 @@ namespace rozetochka_api.Controllers
             if (!ModelState.IsValid)
             {
                 var errors = ModelState
-                    .Where(ms => ms.Value.Errors.Any())
+                    .Where(ms => ms.Value?.Errors.Any() == true)
                     .ToDictionary(
                         kvp => kvp.Key,
-                        kvp => kvp.Value.Errors.Select(e => e.ErrorMessage).ToList()
+                        kvp => kvp.Value!.Errors.Select(e => e.ErrorMessage).ToList()
                     );
 
                 _logger.LogWarning("Validation failed for registration request: {Errors}", string.Join(", ", errors.SelectMany(kvp => kvp.Value)));
