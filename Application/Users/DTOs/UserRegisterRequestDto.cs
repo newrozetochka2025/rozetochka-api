@@ -5,7 +5,7 @@ namespace rozetochka_api.Application.Users.DTOs
     public class UserRegisterRequestDto
     {
         private const int MinLength = 5;
-        private const int MaxLength = 50;
+        private const int MaxLength = 64;
         private const int EmailMaxLength = 100;
         private const int PasswordMinLength = 6;    // TODO later 8
 

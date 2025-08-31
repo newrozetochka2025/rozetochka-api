@@ -2,6 +2,21 @@
 
 namespace rozetochka_api.Application.Users.DTOs.Examples
 {
+
+
+
+
+    // Login
+    public class UserLoginRequestExample : IExamplesProvider<UserLoginRequestDto>
+    {
+        public UserLoginRequestDto GetExamples() => new()
+        {
+            Email = "user@example.com",
+            Password = "P@ssw0rd"
+        };
+    }
+
+    // Register
     public class UserRegisterRequestExample : IExamplesProvider<UserRegisterRequestDto>
     {
         public UserRegisterRequestDto GetExamples() => new()
@@ -13,4 +28,6 @@ namespace rozetochka_api.Application.Users.DTOs.Examples
             Phone = "+380967775533"
         };
     }
+
+
 }

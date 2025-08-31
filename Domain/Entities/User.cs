@@ -9,5 +9,8 @@
         public string Phone { get; set; } = "";
         public string Role { get; set; } = "user";
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+
+        public ICollection<UserRefreshToken> RefreshTokens { get; set; } = new List<UserRefreshToken>();
     }
 }

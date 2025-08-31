@@ -1,7 +1,10 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using rozetochka_api.Application.Users.DTOs;
 using rozetochka_api.Shared;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 namespace rozetochka_api.Controllers
 {
@@ -41,5 +44,27 @@ namespace rozetochka_api.Controllers
 
             return Ok(resp);
         }
+
+
+
+        [HttpGet("profile")]
+        [Authorize]
+        public ActionResult<object> profile()
+        {
+            // Возвращает данные текущего пользователя из JWT (в сваггер требуется токен в Authorize)
+            return Ok(new
+            {
+                sub = User.FindFirstValue(ClaimTypes.NameIdentifier),
+                email = User.FindFirstValue(ClaimTypes.Email),
+                name = User.FindFirstValue(ClaimTypes.Name),
+                role = User.FindFirstValue(ClaimTypes.Role)
+            });
+        }
+
+
+
+
+
+
     }
 }

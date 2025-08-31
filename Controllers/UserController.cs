@@ -1,5 +1,7 @@
 ﻿using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using rozetochka_api.Application.Users.DTOs;
 using rozetochka_api.Application.Users.DTOs.Examples;
 using rozetochka_api.Application.Users.Service;
@@ -26,7 +28,9 @@ namespace rozetochka_api.Controllers
             _mapper = mapper;
         }
 
+        // POST     /api/user/register -> Data: UserResponseDto (201 Created)
         [HttpPost("register")]
+        [AllowAnonymous]
         [SwaggerRequestExample(typeof(UserRegisterRequestDto), typeof(UserRegisterRequestExample))]
         public async Task<ActionResult<RestResponse>> Register([FromBody] UserRegisterRequestDto request)
         {
@@ -34,12 +38,7 @@ namespace rozetochka_api.Controllers
 
             if (!ModelState.IsValid)
             {
-                var errors = ModelState
-                    .Where(ms => ms.Value?.Errors.Any() == true)
-                    .ToDictionary(
-                        kvp => kvp.Key,
-                        kvp => kvp.Value!.Errors.Select(e => e.ErrorMessage).ToList()
-                    );
+                var errors = ToValidationErrors(ModelState);
 
                 _logger.LogWarning("Validation failed for registration request: {Errors}", string.Join(", ", errors.SelectMany(kvp => kvp.Value)));
 
@@ -133,21 +132,96 @@ namespace rozetochka_api.Controllers
         }
 
 
+        // POST     /api/user/login  -> Data: { accessToken, refreshToken, expiresIn, user } (200 OK)
+        [HttpPost("login")]
+        [AllowAnonymous]
+        public async Task<ActionResult<RestResponse>> Login([FromBody] UserLoginRequestDto request)
+        {
+            if (!ModelState.IsValid)
+            {
+                const int code = 422;
+                return StatusCode(code, new RestResponse
+                {
+                    Status = new RestStatus { IsOk = false, Code = code, Phrase = "Unprocessable Entity" },
+                    Meta = new RestMeta { Service = "User Login", Method = "POST", Action = "/api/user/login", DataType = "validation" },
+                    Data = ToValidationErrors(ModelState)
+                });
+            }
+
+            var result = await _userService.LoginAsync(request);
+            if (!result.IsSuccess)
+            {
+                var (code, phrase) = result.ErrorCode == "INVALID_CREDENTIALS" ? (401, "Unauthorized") : (400, "Bad Request");
+                return StatusCode(code, new RestResponse
+                {
+                    Status = new RestStatus { IsOk = false, Code = code, Phrase = phrase },
+                    Meta = new RestMeta { Service = "User Login", Method = "POST", Action = "/api/user/login", DataType = "string" },
+                    Data = result.ErrorMessage
+                });
+            }
+
+            return Ok(new RestResponse
+            {
+                Status = new RestStatus { IsOk = true, Code = 200, Phrase = "OK" },
+                Meta = new RestMeta { Service = "User Login", Method = "POST", Action = "/api/user/login", DataType = "auth_response" },
+                Data = result.Data // AuthResponseDto (accessToken, refreshToken, expiresIn, user)
+            });
+        }
+
+        // POST     /api/user/refresh -> Data: { accessToken, refreshToken, expiresIn, user } (200 OK)
+        [HttpPost("refresh")]
+        [AllowAnonymous]
+        public async Task<ActionResult<RestResponse>> Refresh([FromBody] RefreshRequestDto request)
+        {
+            var result = await _userService.RefreshAsync(request.RefreshToken);
+            if (!result.IsSuccess)
+            {
+                const int code = 401;
+                return StatusCode(code, new RestResponse
+                {
+                    Status = new RestStatus { IsOk = false, Code = code, Phrase = "Unauthorized" },
+                    Meta = new RestMeta { Service = "User Refresh", Method = "POST", Action = "/api/user/refresh", DataType = "string" },
+                    Data = result.ErrorMessage
+                });
+            }
+
+            return Ok(new RestResponse
+            {
+                Status = new RestStatus { IsOk = true, Code = 200, Phrase = "OK" },
+                Meta = new RestMeta { Service = "User Refresh", Method = "POST", Action = "/api/user/refresh", DataType = "jwt" },
+                Data = result.Data  // AuthResponseDto
+            });
+        }
+
+
+        // ----- helpers -----
 
         private static (int statusCode, string phrase) GetErrorResponse(string? errorCode)
         {
             return errorCode switch
             {
-                "EMAIL_TAKEN" => (409, "Conflict"),
-                "USERNAME_TAKEN" => (409, "Conflict"),
-                "VALIDATION_ERROR" => (422, "Unprocessable Entity"),
-                "INVALID_EMAIL" => (422, "Unprocessable Entity"),
-                "INVALID_USERNAME" => (422, "Unprocessable Entity"),
-                "INVALID_PASSWORD" => (422, "Unprocessable Entity"),
-                "PASSWORDS_DONT_MATCH" => (422, "Unprocessable Entity"),
-                "DATABASE_ERROR" => (500, "Internal Server Error"),
-                _ => (400, "Bad Request")
+                "EMAIL_TAKEN"           => (409, "Conflict"),
+                "USERNAME_TAKEN"        => (409, "Conflict"),
+                "VALIDATION_ERROR"      => (422, "Unprocessable Entity"),
+                "INVALID_EMAIL"         => (422, "Unprocessable Entity"),
+                "INVALID_USERNAME"      => (422, "Unprocessable Entity"),
+                "INVALID_PASSWORD"      => (422, "Unprocessable Entity"),
+                "PASSWORDS_DONT_MATCH"  => (422, "Unprocessable Entity"),
+                "DATABASE_ERROR"        => (500, "Internal Server Error"),
+                _                       => (400, "Bad Request")
             };
         }
+
+        // Собирает ошибки ModelState, если !ModelState.IsValid
+        private static Dictionary<string, List<string>> ToValidationErrors(ModelStateDictionary modelState)
+        {
+            return modelState
+                .Where(ms => ms.Value?.Errors.Any() == true)
+                .ToDictionary(
+                    kvp => kvp.Key,
+                    kvp => kvp.Value!.Errors.Select(e => e.ErrorMessage).ToList()
+                );
+        }
+
     }
 }

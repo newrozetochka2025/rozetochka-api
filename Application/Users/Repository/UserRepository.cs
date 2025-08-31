@@ -38,5 +38,24 @@ namespace rozetochka_api.Application.Users.Repository
         {
             return await _db.Users.AnyAsync(u => u.Username == username);
         }
+
+        // Refresh токены
+        public async Task AddRefreshTokenAsync(UserRefreshToken token)
+        {
+            await _db.UserRefreshTokens.AddAsync(token);
+            await _db.SaveChangesAsync();
+        }
+
+        public async Task<UserRefreshToken?> GetRefreshTokenAsync(string token)
+        {
+            return await _db.UserRefreshTokens.Include(t => t.User).FirstOrDefaultAsync(t => t.Token == token && !t.IsRevoked);
+        }
+            
+
+        public async Task RevokeRefreshTokenAsync(UserRefreshToken token)
+        {
+            token.IsRevoked = true;
+            await _db.SaveChangesAsync();
+        }
     }
 }

@@ -1,8 +1,9 @@
-﻿using Microsoft.AspNetCore.Diagnostics;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using rozetochka_api.Application.Users.DTOs.Examples;
 using rozetochka_api.Application.Users.Repository;
 using rozetochka_api.Application.Users.Service;
 using rozetochka_api.Infrastructure.Data;
@@ -10,7 +11,10 @@ using rozetochka_api.Infrastructure.Identity;
 using rozetochka_api.Infrastructure.Identity.Interfaces;
 using rozetochka_api.Shared;
 using Swashbuckle.AspNetCore.Filters;
-using System.Diagnostics;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
@@ -22,14 +26,19 @@ builder.Services.AddControllers();
     - Надо создать свой файл appsettings-Secrets.json и определить его по структуре как описана в appsettings-Secrets.sample.json  ( там секреты + ДБ стринг).
     
     ###
-    - отключил автоматическое поведение (!ModelState.IsValid) [ApiController] (SuppressModelStateInvalidFilter) при невалидной модели, чтобы вручную вернуть RestResponse вместо ProblemDetails.
+    - отключил автоматическое! поведение (!ModelState.IsValid) [ApiController] (SuppressModelStateInvalidFilter) при невалидной модели, чтобы вручную вернуть RestResponse вместо ProblemDetails.
  
+    
  */
 
 /*
    TODO:
-    - CORS ограничить после деплоя фронта   (WithOrigins(...).AllowCredentials())?
+    - CORS ограничить после деплоя фронта   (WithOrigins(...).AllowCredentials())
     - Убрать сваггер с прода в конце разработки. И тест контроллер.
+
+
+    TODO Never:
+    - метод _userRepository.RevokeRefreshTokenAsync не удаляет refresh-токены, старые revoked-токены будут копиться в БД. Очистку нужно выполнять отдельной задачей (напр. раз в месяц: IsRevoked = true && ExpiresAt < Now).
 
  */
 
@@ -37,27 +46,58 @@ builder.Services.AddControllers();
 //--------------------------------------------------------------------------------
 
 // Swagger
+// Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "Rozetochka API", Version = "v1" });
     c.ExampleFilters();
+
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Paste only the JWT (without 'Bearer ')"
+    });
+
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id   = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
 });
-builder.Services.AddSwaggerExamplesFromAssemblyOf<UserRegisterRequestExample>();
+builder.Services.AddSwaggerExamplesFromAssemblyOf<Program>();
 
 //--------------------------------------------------------------------------------
 
 //  Cors
 builder.Services.AddCors(options =>
 {
-    options.AddDefaultPolicy(
-        policy =>
+    options.AddDefaultPolicy(policy =>
         {
             policy
-            .AllowAnyOrigin()
+            .WithOrigins(
+                "https://brave-smoke-0606f8503.1.azurestaticapps.net", 
+                "http://localhost:5173"
+            )
+            //.AllowAnyOrigin()
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .AllowCredentials();
         });
+
 });
 
 //--------------------------------------------------------------------------------
@@ -101,6 +141,37 @@ builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IUserService,    UserService>();
 
 builder.Services.AddAutoMapper(typeof(Program));        // AutoMapper
+
+
+
+
+// JWT auth
+JwtSecurityTokenHandler.DefaultMapInboundClaims = false;        // отключение автомапинга клеймов .net ? чтобы небыло сюрпризов?
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        var keyBase64 = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT:Key is missing");
+        var keyBytes = Convert.FromBase64String(keyBase64!);
+
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer    = builder.Configuration["Jwt:Issuer"],
+
+            ValidateAudience = true,
+            ValidAudience    = builder.Configuration["Jwt:Audience"],
+
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30),
+
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(keyBytes),
+
+            NameClaimType = ClaimTypes.NameIdentifier,
+            RoleClaimType = ClaimTypes.Role
+        };
+    });
 
 //--------------------------------------------------------------------------------
 
@@ -215,7 +286,10 @@ app.UseSwaggerUI(c =>
 
 app.UseHttpsRedirection();
 app.UseCors();              // +
+
+app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapControllers();
 
 
