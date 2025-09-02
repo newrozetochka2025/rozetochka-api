@@ -15,6 +15,7 @@ namespace rozetochka_api.Infrastructure.Data
         public DbSet<Category> Categories { get; set; } = null!;
         public DbSet<Product> Products { get; set; } = null!;
         public DbSet<ProductImage> ProductImages { get; set; } = null!;
+        public DbSet<Banner> Banners { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -170,7 +171,16 @@ namespace rozetochka_api.Infrastructure.Data
                 pi.HasIndex(x => x.ProductId);
             });
 
+            // --- Banner ---
+            modelBuilder.Entity<Banner>(b =>
+            {
+                b.ToTable("Banners");
+                b.HasKey(x => x.Id);
 
+                b.Property(x => x.ImgUrl).HasMaxLength(1024).IsRequired();
+                b.Property(x => x.Href).HasMaxLength(1024).IsRequired();
+
+            });
 
         }
     }

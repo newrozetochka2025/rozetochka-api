@@ -33,7 +33,7 @@ builder.Services.AddControllers();
 
 /*
    TODO:
-    - CORS ограничить после деплоя фронта   (WithOrigins(...).AllowCredentials())
+    - User <-> Product добавить.
     - Убрать сваггер с прода в конце разработки. И тест контроллер.
 
 
@@ -111,7 +111,7 @@ builder.Services.AddDbContextPool<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"),
         sql =>
         {
-            sql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorNumbersToAdd: null);
+            sql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(5), errorNumbersToAdd: null);
             sql.CommandTimeout(30);     // максимальное время ожидания выполнения SQL запроса секунд
         });
     

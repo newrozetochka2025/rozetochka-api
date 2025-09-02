@@ -21,4 +21,10 @@
     <PackageReference Include="Swashbuckle.AspNetCore.Filters" Version="9.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Application\Categories\DTOs\" />
+    <Folder Include="Application\Categories\Service\" />
+    <Folder Include="Application\Products\DTOs\" />
+  </ItemGroup>
+
 </Project>
