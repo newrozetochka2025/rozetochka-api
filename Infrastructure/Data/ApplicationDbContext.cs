@@ -16,6 +16,7 @@ namespace rozetochka_api.Infrastructure.Data
         public DbSet<Product> Products { get; set; } = null!;
         public DbSet<ProductImage> ProductImages { get; set; } = null!;
         public DbSet<Banner> Banners { get; set; } = null!;
+        public DbSet<WishlistItem> WishlistItems { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -92,7 +93,7 @@ namespace rozetochka_api.Infrastructure.Data
                 c.Property(x => x.IconSvgUrl).HasMaxLength(1024);
                 c.Property(x => x.ImageUrl).HasMaxLength(1024);
 
-                // самоссылка
+                // self-reference
                 c.HasOne(x => x.Parent)
                  .WithMany(x => x.Children)
                  .HasForeignKey(x => x.ParentId)
@@ -111,11 +112,17 @@ namespace rozetochka_api.Infrastructure.Data
                 p.HasIndex(x => x.Slug).IsUnique();
                 p.Property(x => x.Slug).HasMaxLength(256).IsRequired();
                 p.Property(x => x.Title).HasMaxLength(256).IsRequired();
-                p.Property(x => x.ImgUrl).HasMaxLength(1024);
+                p.Property(x => x.ImgUrl).HasMaxLength(1024).IsRequired();
 
                 p.Property(x => x.Price).HasPrecision(18, 2);
                 p.Property(x => x.DiscountPrice).HasPrecision(18, 2);
                 p.Property(x => x.CreatedAt).HasColumnType("datetime2(0)");
+
+                // FK на владельца
+                p.HasOne(x => x.Owner)
+                    .WithMany(u => u.Products)
+                    .HasForeignKey(x => x.OwnerId)
+                    .OnDelete(DeleteBehavior.Restrict);     // <- не удаляем продукты при удалении юзера
 
                 // Чек - констрейнты на уровне БД
                 p.ToTable(t =>
@@ -181,6 +188,24 @@ namespace rozetochka_api.Infrastructure.Data
                 b.Property(x => x.Href).HasMaxLength(1024).IsRequired();
 
             });
+
+            // --- Wishlist ---
+            modelBuilder.Entity<WishlistItem>(w =>
+            {
+                w.ToTable("WishlistItems");
+                w.HasKey(x => new { x.UserId, x.ProductId }); // композитный PK
+
+                w.HasOne(x => x.User)
+                 .WithMany(u => u.Wishlist)
+                 .HasForeignKey(x => x.UserId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                w.HasOne(x => x.Product)
+                 .WithMany()    // у Product может быть много WishlistItem, но навигацию не делаем?
+                 .HasForeignKey(x => x.ProductId)
+                 .OnDelete(DeleteBehavior.Cascade);
+            });
+
 
         }
     }

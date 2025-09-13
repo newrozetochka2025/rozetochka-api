@@ -1,11 +1,12 @@
 ﻿using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.ModelBinding;
 using rozetochka_api.Application.Users.DTOs;
 using rozetochka_api.Application.Users.DTOs.Examples;
 using rozetochka_api.Application.Users.Service;
 using rozetochka_api.Shared;
+using rozetochka_api.Shared.Extensions;
+using rozetochka_api.Shared.Helpers;
 using Swashbuckle.AspNetCore.Filters;
 
 namespace rozetochka_api.Controllers
@@ -38,11 +39,11 @@ namespace rozetochka_api.Controllers
 
             if (!ModelState.IsValid)
             {
-                var errors = ToValidationErrors(ModelState);
+                var errors = ModelState.ToErrorDictionary();
 
                 _logger.LogWarning("Validation failed for registration request: {Errors}", string.Join(", ", errors.SelectMany(kvp => kvp.Value)));
 
-                var (statusCode, phrase) = GetErrorResponse("VALIDATION_ERROR");
+                var (statusCode, phrase) = HttpErrorMapping.Get("VALIDATION_ERROR");
 
                 var errorResponse = new RestResponse
                 {
@@ -75,7 +76,7 @@ namespace rozetochka_api.Controllers
 
                 if (!result.IsSuccess)
                 {
-                    var (statusCode, phrase) = GetErrorResponse(result.ErrorCode);
+                    var (statusCode, phrase) = HttpErrorMapping.Get(result.ErrorCode);
 
                     var errorResponse = new RestResponse
                     {
@@ -139,19 +140,19 @@ namespace rozetochka_api.Controllers
         {
             if (!ModelState.IsValid)
             {
-                const int code = 422;
+                var (code, phrase) = HttpErrorMapping.Get("VALIDATION_ERROR");
                 return StatusCode(code, new RestResponse
                 {
-                    Status = new RestStatus { IsOk = false, Code = code, Phrase = "Unprocessable Entity" },
+                    Status = new RestStatus { IsOk = false, Code = code, Phrase = phrase },
                     Meta = new RestMeta { Service = "User Login", Method = "POST", Action = "/api/user/login", DataType = "validation" },
-                    Data = ToValidationErrors(ModelState)
+                    Data = ModelState.ToErrorDictionary()
                 });
             }
 
             var result = await _userService.LoginAsync(request);
             if (!result.IsSuccess)
             {
-                var (code, phrase) = result.ErrorCode == "INVALID_CREDENTIALS" ? (401, "Unauthorized") : (400, "Bad Request");
+                var (code, phrase) = HttpErrorMapping.Get(result.ErrorCode ?? "INVALID_CREDENTIALS");
                 return StatusCode(code, new RestResponse
                 {
                     Status = new RestStatus { IsOk = false, Code = code, Phrase = phrase },
@@ -194,34 +195,6 @@ namespace rozetochka_api.Controllers
         }
 
 
-        // ----- helpers -----
-
-        private static (int statusCode, string phrase) GetErrorResponse(string? errorCode)
-        {
-            return errorCode switch
-            {
-                "EMAIL_TAKEN"           => (409, "Conflict"),
-                "USERNAME_TAKEN"        => (409, "Conflict"),
-                "VALIDATION_ERROR"      => (422, "Unprocessable Entity"),
-                "INVALID_EMAIL"         => (422, "Unprocessable Entity"),
-                "INVALID_USERNAME"      => (422, "Unprocessable Entity"),
-                "INVALID_PASSWORD"      => (422, "Unprocessable Entity"),
-                "PASSWORDS_DONT_MATCH"  => (422, "Unprocessable Entity"),
-                "DATABASE_ERROR"        => (500, "Internal Server Error"),
-                _                       => (400, "Bad Request")
-            };
-        }
-
-        // Собирает ошибки ModelState, если !ModelState.IsValid
-        private static Dictionary<string, List<string>> ToValidationErrors(ModelStateDictionary modelState)
-        {
-            return modelState
-                .Where(ms => ms.Value?.Errors.Any() == true)
-                .ToDictionary(
-                    kvp => kvp.Key,
-                    kvp => kvp.Value!.Errors.Select(e => e.ErrorMessage).ToList()
-                );
-        }
 
     }
 }

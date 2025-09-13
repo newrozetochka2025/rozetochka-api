@@ -18,5 +18,9 @@ namespace rozetochka_api.Application.Products.Repository
         Task AddAsync(Product product);
         Task UpdateAsync(Product product);
         Task DeleteAsync(Guid id);
+
+        Task<List<Guid>> GetExistingCategoryIdsAsync(IReadOnlyCollection<Guid> ids);    // существующие id категорий у продукта
+        Task<bool> IsSlugExistAsync(string slug, Guid? exceptId = null);
+        Task SetCategoriesAsync(Guid productId, IReadOnlyCollection<Guid> categoryIds);
     }
 }

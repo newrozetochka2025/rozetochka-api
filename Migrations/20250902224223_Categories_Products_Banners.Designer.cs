@@ -12,8 +12,8 @@ using rozetochka_api.Infrastructure.Data;
 namespace rozetochka_api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250902200145_category_product_banner")]
-    partial class category_product_banner
+    [Migration("20250902224223_Categories_Products_Banners")]
+    partial class Categories_Products_Banners
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

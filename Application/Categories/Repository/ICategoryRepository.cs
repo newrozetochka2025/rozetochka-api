@@ -12,11 +12,12 @@ namespace rozetochka_api.Application.Categories.Repository
         Task<Category?> GetCategoryById(Guid id);
         Task<Category?> GetCategoryWithProductsById(Guid id);
 
-
+        
         Task AddCategoryAsync(Category category);
         Task DeleteCategoryAsync(Guid id);
         Task UpdateCategoryAsync(Category category);
 
 
+        Task<bool> IsSlugExistAsync(string slug, Guid? exceptId = null);
     }
 }

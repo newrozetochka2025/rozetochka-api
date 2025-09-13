@@ -4,8 +4,15 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using rozetochka_api.Application.Banners.Repository;
+using rozetochka_api.Application.Banners.Service;
+using rozetochka_api.Application.Categories.Repository;
+using rozetochka_api.Application.Categories.Service;
+using rozetochka_api.Application.Products.Repository;
+using rozetochka_api.Application.Products.Service;
 using rozetochka_api.Application.Users.Repository;
 using rozetochka_api.Application.Users.Service;
+using rozetochka_api.Application.Wishlist.Repository;
 using rozetochka_api.Infrastructure.Data;
 using rozetochka_api.Infrastructure.Identity;
 using rozetochka_api.Infrastructure.Identity.Interfaces;
@@ -24,6 +31,8 @@ builder.Services.AddControllers();
     
     - в Azure portal, SQL Server в Бзопасность -> Сеть  добавляли свой IP adreess, со временем свой ip может изменится и надо будет обновить свой ip?
     - Надо создать свой файл appsettings-Secrets.json и определить его по структуре как описана в appsettings-Secrets.sample.json  ( там секреты + ДБ стринг).
+
+    - slug для Category заполняется в админке админом, в Product ложим туда product.id
     
     ###
     - отключил автоматическое! поведение (!ModelState.IsValid) [ApiController] (SuppressModelStateInvalidFilter) при невалидной модели, чтобы вручную вернуть RestResponse вместо ProblemDetails.
@@ -33,13 +42,22 @@ builder.Services.AddControllers();
 
 /*
    TODO:
+    - ротация refresh tokens. в ДБ хэш токена
     - User <-> Product добавить.
     - Убрать сваггер с прода в конце разработки. И тест контроллер.
-
+    - BannerRepository -> GetAllAsync(); Вернет все банеры, ограничить потом?
+    - Prduct Mapper -> Заглушка  IsInWishlist, m => m.Ignore()
+    - Проблема Slug-а,  пока что его надо вводить при создании Product, потом сделать Slugify? 
+            или пока что сделать туда ложить Id ...
+    - В Product потмо Слаг посмотреть, и мб возвращать на фронт в slug -> product.id
+    - В Контроллерах дублируются Хелперы... вынести в метод расширения контроллера или ....
 
     TODO Never:
     - метод _userRepository.RevokeRefreshTokenAsync не удаляет refresh-токены, старые revoked-токены будут копиться в БД. Очистку нужно выполнять отдельной задачей (напр. раз в месяц: IsRevoked = true && ExpiresAt < Now).
 
+
+    DUNNO:
+    - В Product DB ->  .OnDelete(DeleteBehavior.Restrict); не удаляем продукты при удалении юзера ??? Делать какой-то isHide ?
  */
 
 
@@ -60,7 +78,7 @@ builder.Services.AddSwaggerGen(c =>
         Scheme = "bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "Paste only the JWT (without 'Bearer ')"
+        Description = "Paste only the JWT access token"
     });
 
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -111,7 +129,7 @@ builder.Services.AddDbContextPool<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"),
         sql =>
         {
-            sql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(5), errorNumbersToAdd: null);
+            sql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(10), errorNumbersToAdd: null);
             sql.CommandTimeout(30);     // максимальное время ожидания выполнения SQL запроса секунд
         });
     
@@ -137,10 +155,21 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 // DI services
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
-builder.Services.AddScoped<IUserService,    UserService>();
 
-builder.Services.AddAutoMapper(typeof(Program));        // AutoMapper
+builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
+builder.Services.AddScoped<ICategoryService,    CategoryService>();
+
+builder.Services.AddScoped<IProductRepository,  ProductRepository>();
+builder.Services.AddScoped<IProductService,     ProductService>();
+
+builder.Services.AddScoped<IBannerRepository,   BannerRepository>();
+builder.Services.AddScoped<IBannerService,      BannerService>();
+
+builder.Services.AddScoped<IWishlistRepository, WishlistRepository>();
+
+builder.Services.AddAutoMapper(typeof(Program));        // AutoMapper (program текущая сборка only)
 
 
 

@@ -58,7 +58,7 @@ namespace rozetochka_api.Application.Categories.Repository
         {
             return await _db.Categories
                 .Include(c => c.Products)
-                    .ThenInclude(p => p.Images)
+                .ThenInclude(p => p.Images)
                 .AsSplitQuery()
                 .AsNoTracking()
                 .FirstOrDefaultAsync(c => c.Id == id);
@@ -66,6 +66,9 @@ namespace rozetochka_api.Application.Categories.Repository
 
         public async Task AddCategoryAsync(Category category)
         {
+            if (await IsSlugExistAsync(category.Slug))
+                throw new InvalidOperationException($"Slug '{category.Slug}' already taken.");
+
             await _db.Categories.AddAsync(category);
             await _db.SaveChangesAsync();
         }
@@ -92,13 +95,25 @@ namespace rozetochka_api.Application.Categories.Repository
             if (existing == null)
                 throw new KeyNotFoundException($"Category '{category.Id}' not found.");
 
-            existing.Title = category.Title;
+            if (await IsSlugExistAsync(category.Slug, category.Id))
+                throw new InvalidOperationException($"Slug '{category.Slug}' already taken.");
+
+            if (category.ParentId == category.Id)
+                throw new InvalidOperationException("Category cannot be its own parent.");
+
+            existing.Title      = category.Title;
             existing.IconSvgUrl = category.IconSvgUrl;
-            existing.Slug = category.Slug;
-            existing.ImageUrl = category.ImageUrl;
-            existing.ParentId = category.ParentId;
+            existing.Slug       = category.Slug;
+            existing.ImageUrl   = category.ImageUrl;
+            existing.ParentId   = category.ParentId;
 
             await _db.SaveChangesAsync();
+        }
+
+        public Task<bool> IsSlugExistAsync(string  slug, Guid? exceptId = null)
+        {
+            slug = (slug ?? "").Trim().ToLowerInvariant();
+            return _db.Categories.AnyAsync(c => c.Slug == slug && (!exceptId.HasValue || c.Id != exceptId.Value));
         }
     }
 }
